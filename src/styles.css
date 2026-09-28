@@ -59,13 +59,13 @@ button:disabled {
   position: sticky;
   top: 0;
   height: 100vh;
-  padding: 26px 22px;
+  padding: 18px 22px;
   border-right: 1px solid rgba(237, 247, 255, 0.11);
   background: rgba(8, 11, 18, 0.82);
   backdrop-filter: blur(18px);
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 14px;
 }
 
 .brand,
@@ -156,7 +156,7 @@ button:disabled {
 }
 
 .nav-node {
-  min-height: 48px;
+  min-height: 44px;
   border: 1px solid rgba(237, 247, 255, 0.11);
   background: rgba(255, 255, 255, 0.04);
   color: #dcecff;
@@ -204,6 +204,7 @@ button:disabled {
   font-size: 0.82rem;
   font-weight: 800;
   text-transform: uppercase;
+  margin-bottom: 16px;
 }
 
 .signal-panel code,
@@ -911,4 +912,26 @@ th {
   .story-copy p {
     font-size: 1.25rem;
   }
+}
+
+.reset-progress-action {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.reset-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 7, 12, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.reset-modal {
+  width: min(440px, 100%);
+  min-height: auto;
+  padding: 24px;
 }
