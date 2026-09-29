@@ -15,6 +15,7 @@ import {
   TerminalSquare,
   X,
 } from 'lucide-react';
+import { useQuestProgress } from './hooks/useQuestProgress';
 
 const modules = [
   {
@@ -93,10 +94,10 @@ const logLines = [
 ];
 
 export default function App() {
-  const [active, setActive] = useState(0);
-  const [solved, setSolved] = useState([]);
-  const [showBriefing, setShowBriefing] = useState(true);
-  const [readStories, setReadStories] = useState([]);
+  // Подключаем состояние прогресса квеста и функции его изменения
+  const { active, setActive, solved, setSolved, showBriefing, setShowBriefing, readStories, setReadStories, resetProgress } = useQuestProgress();
+
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const module = modules[active];
   const ModuleIcon = module.icon;
@@ -125,11 +126,15 @@ export default function App() {
     }
   }
 
+  // Открываем окно подтверждения перед сбросом прогресса
   function resetMission() {
-    setActive(0);
-    setSolved([]);
-    setShowBriefing(true);
-    setReadStories([]);
+    setShowResetModal(true);
+  }
+
+  // Сбрасываем прогресс после подтверждения
+  function confirmReset() {
+    resetProgress();
+    setShowResetModal(false);
   }
 
   const markStoryRead = useCallback((storyKey) => {
@@ -192,7 +197,43 @@ export default function App() {
             <code key={line}>{line}</code>
           ))}
         </div>
+
+        <button className="ghost-action reset-progress-action" onClick={resetMission}>
+            <RotateCcw size={16} />
+            Сбросить прогресс
+        </button>
       </aside>
+
+      {showResetModal && (
+      <div className="reset-modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setShowResetModal(false);
+          }
+        }}>
+        <div className="challenge-frame reset-modal">
+          <div className="panel-title">
+            <AlertTriangle size={16} />
+            Подтверждение
+          </div>
+
+          <h2>Сбросить прогресс?</h2>
+
+          <p>
+            Выполненные задания и текущий этап квеста будут обнулены.
+          </p>
+
+          <div className="action-row">
+            <button className="ghost-action" onClick={() => setShowResetModal(false)}>
+              Отмена
+            </button>
+
+            <button className="primary-action" onClick={confirmReset}>
+              Сбросить
+            </button>
+          </div>
+        </div>
+      </div>
+      )}
 
       <section className="stage">
         <header className="stage-header">
