@@ -1,0 +1,24 @@
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  frontend-prod:
+    image: ghcr.io/veselovese/mospoly-quest-site:main
+    restart: unless-stopped
+
+  frontend-stage:
+    image: ghcr.io/veselovese/mospoly-quest-site:dev
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
