@@ -15,7 +15,12 @@ import {
   TerminalSquare,
   X,
 } from 'lucide-react';
-import { useQuestProgress } from './hooks/useQuestProgress';
+import {
+  DIFFICULTIES,
+  useQuestProgress,
+} from './hooks/useQuestProgress';
+import { LevelChallenge } from './DifficultyChallenges.jsx';
+
 
 const modules = [
   {
@@ -94,56 +99,94 @@ const logLines = [
 ];
 
 export default function App() {
-  // Подключаем состояние прогресса квеста и функции его изменения
-  const { active, setActive, solved, setSolved, showBriefing, setShowBriefing, readStories, setReadStories, resetProgress } = useQuestProgress();
+  const {
+    difficulty,
+    setDifficulty,
+    active,
+    setActive,
+    solved,
+    setSolved,
+    showBriefing,
+    setShowBriefing,
+    readStories,
+    setReadStories,
+    resetProgress,
+  } = useQuestProgress();
 
   const [showResetModal, setShowResetModal] = useState(false);
 
   const module = modules[active];
   const ModuleIcon = module.icon;
-  const Challenge = module.component;
+  const MediumChallenge = module.component;
+
   const isSolved = solved.includes(module.id);
   const progress = Math.round((solved.length / modules.length) * 100);
 
-  const unlocked = useMemo(() => {
-    return modules.map((item, index) => index === 0 || solved.includes(modules[index - 1].id));
-  }, [solved]);
+  const difficultyLabel = DIFFICULTIES.find(
+    (item) => item.id === difficulty,
+  ).label;
+
+  const storyKey = `${module.id}-${isSolved ? 'outcome' : 'intro'}`;
+
+  const unlocked = useMemo(
+    () =>
+      modules.map(
+        (item, index) =>
+          index === 0 || solved.includes(modules[index - 1].id),
+      ),
+    [solved],
+  );
 
   function solveCurrent() {
-    setSolved((items) => (items.includes(module.id) ? items : [...items, module.id]));
+    setSolved((items) =>
+      items.includes(module.id) ? items : [...items, module.id],
+    );
 
-    if (active < modules.length - 1) {
-      setActive(active + 1);
-    }
-
+    // Сначала показываем результат текущего этапа.
+    // Следующий модуль открывается кнопкой «Следующий след».
     setShowBriefing(true);
   }
 
   function goNext() {
-    if (active < modules.length - 1) {
+    if (active < modules.length - 1 && isSolved) {
       setActive(active + 1);
       setShowBriefing(true);
     }
   }
 
-  // Открываем окно подтверждения перед сбросом прогресса
   function resetMission() {
     setShowResetModal(true);
   }
 
-  // Сбрасываем прогресс после подтверждения
   function confirmReset() {
     resetProgress();
     setShowResetModal(false);
   }
 
-  const markStoryRead = useCallback((storyKey) => {
-    setReadStories((items) => (items.includes(storyKey) ? items : [...items, storyKey]));
-  }, []);
+  function changeDifficulty(event) {
+    setShowResetModal(false);
+    setDifficulty(event.target.value);
+  }
+
+  const markStoryRead = useCallback(
+    (key) => {
+      setReadStories((items) =>
+        items.includes(key) ? items : [...items, key],
+      );
+    },
+    [setReadStories],
+  );
 
   return (
-    <main className="app-shell" style={{ '--accent': module.accent, '--accent-rgb': module.accentRgb }}>
+    <main
+      className="app-shell"
+      style={{
+        '--accent': module.accent,
+        '--accent-rgb': module.accentRgb,
+      }}
+    >
       <div className="scanlines" aria-hidden="true" />
+
       <aside className="side-rail">
         <div className="brand">
           <div className="brand-mark">
@@ -170,10 +213,13 @@ export default function App() {
             const Icon = item.icon;
             const available = unlocked[index];
             const done = solved.includes(item.id);
+
             return (
               <button
                 key={item.id}
-                className={`nav-node ${active === index ? 'active' : ''} ${done ? 'done' : ''}`}
+                className={`nav-node ${
+                  active === index ? 'active' : ''
+                } ${done ? 'done' : ''}`}
                 disabled={!available}
                 onClick={() => {
                   setActive(index);
@@ -198,76 +244,130 @@ export default function App() {
           ))}
         </div>
 
-        <button className="ghost-action reset-progress-action" onClick={resetMission}>
-            <RotateCcw size={16} />
-            Сбросить прогресс
+        <button
+          className="ghost-action reset-progress-action"
+          onClick={resetMission}
+        >
+          <RotateCcw size={16} />
+          Сбросить прогресс
         </button>
       </aside>
 
       {showResetModal && (
-      <div className="reset-modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) {
-            setShowResetModal(false);
-          }
-        }}>
-        <div className="challenge-frame reset-modal">
-          <div className="panel-title">
-            <AlertTriangle size={16} />
-            Подтверждение
-          </div>
+        <div
+          className="reset-modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowResetModal(false);
+            }
+          }}
+        >
+          <div
+            className="challenge-frame reset-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-dialog-title"
+          >
+            <div className="panel-title">
+              <AlertTriangle size={16} />
+              Подтверждение
+            </div>
 
-          <h2>Сбросить прогресс?</h2>
+            <h2 id="reset-dialog-title">Сбросить прогресс?</h2>
 
-          <p>
-            Выполненные задания и текущий этап квеста будут обнулены.
-          </p>
+            <p>
+              Выполненные задания и текущий этап будут обнулены только
+              для уровня «{difficultyLabel}». Прогресс остальных
+              уровней сохранится.
+            </p>
 
-          <div className="action-row">
-            <button className="ghost-action" onClick={() => setShowResetModal(false)}>
-              Отмена
-            </button>
+            <div className="action-row">
+              <button
+                className="ghost-action"
+                onClick={() => setShowResetModal(false)}
+              >
+                Отмена
+              </button>
 
-            <button className="primary-action" onClick={confirmReset}>
-              Сбросить
-            </button>
+              <button className="primary-action" onClick={confirmReset}>
+                Сбросить
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       <section className="stage">
-        <header className="stage-header">
-          <div>
-            <span className="eyebrow">Модуль {active + 1} / 5</span>
+        <header className="stage-header quest-stage-header">
+          <div className="stage-heading">
+            <span className="eyebrow">
+              Модуль {active + 1} / {modules.length}
+            </span>
             <h1>{module.title}</h1>
           </div>
-          <div className="module-token">
-            <ModuleIcon size={24} />
-            <span>{module.label}</span>
+
+          <div className="stage-header-controls">
+            <label className="difficulty-control">
+              <span>Сложность</span>
+              <select
+                aria-label="Уровень сложности"
+                value={difficulty}
+                onChange={changeDifficulty}
+                title="Прогресс каждого уровня сохраняется отдельно"
+              >
+                {DIFFICULTIES.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="module-token">
+              <ModuleIcon size={24} />
+              <span>{module.label}</span>
+            </div>
           </div>
         </header>
 
         {showBriefing ? (
           <StoryInterlude
-            key={`${module.id}-${isSolved ? 'outcome' : 'intro'}`}
+            key={`${difficulty}-${storyKey}`}
             module={module}
             isSolved={isSolved}
             isFinal={active === modules.length - 1}
-            hasPlayed={readStories.includes(`${module.id}-${isSolved ? 'outcome' : 'intro'}`)}
+            hasPlayed={readStories.includes(storyKey)}
             onRead={markStoryRead}
             onStart={() => setShowBriefing(false)}
             onNext={goNext}
             onReset={resetMission}
           />
         ) : (
-          <ChallengeFrame solved={isSolved} onBrief={() => setShowBriefing(true)}>
-            <Challenge onSolve={solveCurrent} solved={isSolved} />
+          <ChallengeFrame
+            key={`${difficulty}-${module.id}`}
+            solved={isSolved}
+            onBrief={() => setShowBriefing(true)}
+          >
+            {difficulty === 'medium' ? (
+              <MediumChallenge
+                onSolve={solveCurrent}
+                solved={isSolved}
+              />
+            ) : (
+              <LevelChallenge
+                difficulty={difficulty}
+                moduleId={module.id}
+                onSolve={solveCurrent}
+                solved={isSolved}
+              />
+            )}
           </ChallengeFrame>
         )}
       </section>
     </main>
   );
 }
+
 
 function StoryInterlude({ module, isSolved, isFinal, hasPlayed, onRead, onStart, onNext, onReset }) {
   const storyKey = `${module.id}-${isSolved ? 'outcome' : 'intro'}`;

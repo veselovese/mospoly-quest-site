@@ -935,3 +935,185 @@ th {
   min-height: auto;
   padding: 24px;
 }
+/* Переключатель сложности в хедере */
+
+.quest-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.quest-stage-header .stage-heading {
+  min-width: 0;
+}
+
+.stage-header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.stage-header-controls > .module-token {
+  order: 1;
+}
+
+.difficulty-control {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 144px;
+  font: inherit;
+}
+
+.difficulty-control > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.difficulty-control select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--accent-rgb, 41, 240, 200), 0.3);
+  border-radius: 8px;
+  background: #10151d;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.difficulty-control select:hover {
+  border-color: rgba(var(--accent-rgb, 41, 240, 200), 0.65);
+}
+
+.difficulty-control select:focus-visible {
+  outline: 2px solid var(--accent, #29f0c8);
+  outline-offset: 3px;
+}
+
+.difficulty-control option {
+  background: #10151d;
+  color: #e8edf4;
+}
+
+/* Дополнительные таблицы в новых заданиях */
+
+.difficulty-table-block {
+  margin-bottom: 20px;
+}
+
+.difficulty-table-block:last-child {
+  margin-bottom: 0;
+}
+
+.difficulty-table-block > .panel-title {
+  margin-bottom: 10px;
+}
+
+.difficulty-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.difficulty-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.difficulty-table-scroll th,
+.difficulty-table-scroll td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.difficulty-table-scroll th {
+  font-weight: 600;
+  color: var(--accent, #29f0c8);
+}
+
+.difficulty-table-scroll tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Дополнительные состояния */
+
+.difficulty-submit {
+  margin-top: 20px;
+}
+
+.difficulty-warning {
+  margin: 12px 0;
+  color: #ffdd55;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.difficulty-control select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Адаптация хедера */
+
+@media (max-width: 900px) {
+  .quest-stage-header {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .stage-header-controls {
+    margin-left: auto;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 540px) {
+  .quest-stage-header .stage-heading {
+    flex-basis: 100%;
+  }
+
+  .stage-header-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .difficulty-control {
+    min-width: 140px;
+    margin-left: auto;
+  }
+
+  .difficulty-table-scroll th,
+  .difficulty-table-scroll td {
+    padding: 8px;
+    font-size: 12px;
+  }
+}
+/* Узлы простой и тяжёлой сложности используют
+   существующее оформление среднего уровня. */
+
+   .difficulty-topology .node:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  
+  @media (min-width: 861px) {
+    .difficulty-topology.topology--hard {
+      min-height: 660px;
+    }
+  }
+  
