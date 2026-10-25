@@ -1386,6 +1386,13 @@ th {
   justify-items: start;
 }
 
+.hint-policy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .submit-feedback {
   margin: 0;
   padding: 10px 12px;

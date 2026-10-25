@@ -258,6 +258,12 @@ function QuestScreen({
     }
   }
 
+  async function revealHint() {
+    setPending(true);
+    try { await session.revealHint(task.taskType); }
+    finally { setPending(false); }
+  }
+
   function goNext() {
     if (index < questTasks.length - 1) {
       session.setActive(index + 1);
@@ -312,7 +318,7 @@ function QuestScreen({
                 <button
                   key={item.taskType}
                   className={`nav-node ${index === itemIndex ? 'active' : ''} ${done ? 'done' : ''}`}
-                  disabled={!unlocked[itemIndex]}
+                  disabled={!unlocked[itemIndex] || pending || finishPending}
                   onClick={() => openTask(itemIndex)}
                 >
                   <Icon size={18} />
@@ -399,6 +405,9 @@ function QuestScreen({
                 solved={solved.includes(task.taskType)}
                 attempts={attempts[task.taskType] ?? 0}
                 onBrief={() => session.setShowBriefing(true)}
+                hintReceipt={state.hints[task.taskType]}
+                onRevealHint={revealHint}
+                pending={pending || finishPending}
               >
                 <task.component
                   key={task.taskType}
