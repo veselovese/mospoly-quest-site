@@ -26,6 +26,8 @@ function createInitialState() {
     attempts: {},
     // Начисленные баллы по заданиям: { [ключ]: баллы }
     points: {},
+    // Подтверждённые сервером подсказки и оставшиеся баллы по заданиям.
+    hints: {},
     // Показывается ли брифинг текущего задания
     showBriefing: true,
     // Брифинги, текст которых уже напечатан
@@ -113,6 +115,7 @@ export class QuestSession {
   // Загружает активные задания участника
   async loadTasks() {
     this.#requireParticipant();
+    const { normalizeHintPolicy, parseHintReceipt } = await import('./hintPolicy.js');
     const response = await getTasks(this.#state.participant.token);
 
     const tasks = (Array.isArray(response) ? response : [])
@@ -122,10 +125,16 @@ export class QuestSession {
         taskType: task.task_type,
         points: task.points,
         order: task.order,
+        hintPenalty: normalizeHintPolicy(task.hint_penalty),
       }))
       .sort((a, b) => a.order - b.order);
 
-    this.#update({ tasks });
+    const hints = {};
+    for (const item of Array.isArray(response) ? response : []) {
+      const task = tasks.find((entry) => entry.id === item.id);
+      if (task.hintPenalty) hints[task.taskType] = parseHintReceipt(item, task.points, task.hintPenalty.maxHints);
+    }
+    this.#update({ tasks, hints });
     return tasks;
   }
 
@@ -155,6 +164,24 @@ export class QuestSession {
     });
 
     return result;
+  }
+
+  // Номер начинается с 1; повтор того же запроса не списывает баллы ещё раз.
+  async revealHint(taskKey) {
+    this.#requireParticipant();
+    const task = this.getTask(taskKey);
+    if (this.#state.status !== 'active' || !task?.hintPenalty || this.#state.solved.includes(taskKey) || this.#state.skipped?.includes(taskKey)) {
+      throw new ApiError('Подсказка недоступна.', { status: 409 });
+    }
+    const used = this.#state.hints[taskKey]?.used ?? 0;
+    if (used >= task.hintPenalty.maxHints) return this.#state.hints[taskKey];
+    const { revealTaskHint } = await import('../api/client');
+    const { parseHintReceipt } = await import('./hintPolicy.js');
+    const response = await revealTaskHint(this.#state.participant.token, task.id, used + 1);
+    const receipt = parseHintReceipt(response, task.points, task.hintPenalty.maxHints);
+    if (receipt.used < used + 1) throw new ApiError('Сервер не подтвердил открытие подсказки.');
+    this.#update({ hints: { ...this.#state.hints, [taskKey]: receipt } });
+    return receipt;
   }
 
   // Завершает квест на сервере; при ошибке сессия остаётся сохранённой для повтора.
@@ -261,6 +288,11 @@ function readStoredState() {
     solved: isStringArray(saved.solved) ? saved.solved : initial.solved,
     attempts: isNumberMap(saved.attempts) ? saved.attempts : initial.attempts,
     points: isNumberMap(saved.points) ? saved.points : initial.points,
+    hints: saved.hints && typeof saved.hints === 'object'
+      ? Object.fromEntries(Object.entries(saved.hints).filter(([, value]) => value
+        && Number.isInteger(value.used) && value.used >= 0
+        && Number.isInteger(value.availablePoints) && value.availablePoints >= 0))
+      : initial.hints,
     showBriefing: typeof saved.showBriefing === 'boolean' ? saved.showBriefing : initial.showBriefing,
     readStories: isStringArray(saved.readStories) ? saved.readStories : initial.readStories,
     finishedAt: typeof saved.finishedAt === 'string' ? saved.finishedAt : null,
