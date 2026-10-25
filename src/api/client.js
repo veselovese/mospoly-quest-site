@@ -96,3 +96,10 @@ export function finishParticipant(token, reason) {
 export function getRanking({ signal } = {}) {
   return request('/ranking/', { signal });
 }
+
+// Идемпотентное открытие подсказки: сервер фиксирует номер до выдачи текста.
+export function revealTaskHint(token, taskId, hintIndex) {
+  return request(`/tasks/${taskId}/hints/`, {
+    method: 'POST', token, body: { hint_index: hintIndex },
+  });
+}
