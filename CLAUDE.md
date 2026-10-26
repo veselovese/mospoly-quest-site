@@ -117,7 +117,7 @@ https://docs.google.com/document/d/1fm_Te2qU-venO1RUg8qCLwjuakVoO_niPZM05p0PdNw/
 
 ## Подсказки со штрафом (#24, клиентская часть)
 
-См. `docs/hint-penalties.md`: отдельный предлагаемый `POST /tasks/{id}/hints/`, идемпотентный номер, серверные `hint_penalty/hints_used/available_points` в `GET /tasks/`. Без политики новые подсказки не раскрываются. `QuestSession.revealHint` сохраняет только подтверждённый результат. Mock уменьшает награду/итог/рейтинг на 1 балл за каждую подсказку; рабочая политика задаётся сервером. Это не завершённая интеграция с Django. Тесты: `node --test tests/hintPolicy.test.js tests/hintApi.test.js`.
+См. `docs/hint-penalties.md`: `POST /tasks/{id}/hints/`, идемпотентный номер, серверные `hint_penalty/hints_used/available_points` в `GET /tasks/`. Без политики новые подсказки не раскрываются. `QuestSession.revealHint` сохраняет только подтверждённый результат. Mock уменьшает награду/итог/рейтинг на 1 балл за каждую подсказку; рабочая политика задаётся сервером. Контракт проверен с настоящим Django API 26.10.2026; серверная часть в LineAhpe/mospoly-quest-backend PR2. Сначала выпустить backend с миграцией 0005, затем frontend PR11. Тесты: `node --test tests/hintPolicy.test.js tests/hintApi.test.js`.
 
 ## Проверка изменений
 
