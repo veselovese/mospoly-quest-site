@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Check,
   Globe2,
+  Hourglass,
   Loader2,
   LogOut,
   Menu,
@@ -12,21 +13,36 @@ import {
   Trophy,
   X,
 } from 'lucide-react';
-import { getQuestConfig } from './api/client';
+import { ApiError, getEvent } from './api/client';
 import { useQuestSession } from './hooks/useQuestSession';
 import { getFallbackQuestConfig, normalizeQuestKey, QUEST_REGISTRY } from './quest/questRegistry';
 import ChallengeFrame from './components/ChallengeFrame';
 import ConfirmModal from './components/ConfirmModal';
 import FinishScreen from './components/FinishScreen';
 import RegistrationScreen from './components/RegistrationScreen';
+import EventCodeScreen from './components/EventCodeScreen';
 import QuestContentProtection from './components/QuestContentProtection';
+import QuestTimer from './components/QuestTimer';
 import StoryInterlude from './components/StoryInterlude';
 import { getUnlockedTasks } from './session/taskNavigation.js';
+import { isTimeExpired, resolveDeadline, resolveTimeLimit } from './session/questTimer';
 import { plural } from './utils/format';
 import { isCompletionStorageKey, readCompletion } from './session/completionStore';
+import {
+  EVENT_CLOSED_MESSAGE,
+  eventErrorMessage,
+  forgetEvent,
+  isValidEventCode,
+  leaderboardHref,
+  normalizeEventCode,
+  readEvent,
+  rememberEvent,
+} from './session/eventCode';
 
 const DEFAULT_ACCENT = { accent: '#29f0c8', accentRgb: '41, 240, 200' };
-const MOCK_QUEST_KEY = import.meta.env.VITE_MOCK_QUEST === 'orlov' ? 'orlov' : 'zoo';
+
+// Код из ссылки или QR-кода на мероприятии: /?id=6479
+const LINK_EVENT_CODE = normalizeEventCode(new URLSearchParams(window.location.search).get('id') ?? '');
 
 export default function App() {
   // Сессия участника хранится в localStorage (src/session/QuestSession.js).
@@ -35,65 +51,86 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [finishError, setFinishError] = useState('');
   const [finishPending, setFinishPending] = useState(false);
-  const [serverQuestConfig, setServerQuestConfig] = useState(null);
-  const [configLoaded, setConfigLoaded] = useState(false);
+  // Мероприятие { code, title, quest }: из ссылки, из памяти устройства или с экрана ввода кода.
+  const [event, setEvent] = useState(() => readEvent());
+  const [eventError, setEventError] = useState('');
+  const [checkingLink, setCheckingLink] = useState(
+    () => isValidEventCode(LINK_EVENT_CODE) && state.status !== 'active' && readEvent()?.code !== LINK_EVENT_CODE,
+  );
 
-  // Активный квест задаёт сервер. Запасная конфигурация нужна для локального режима и ошибок сети.
+  // Квест задаёт мероприятие; у начатой смены — то, на котором участник зарегистрирован.
+  const isActive = state.status === 'active';
+  const eventQuest = (isActive ? state.participant?.quest : null) ?? event?.quest ?? null;
+  const eventCode = (isActive ? state.participant?.event?.code : event?.code) ?? null;
+  const activeQuestKey = normalizeQuestKey(eventQuest?.key);
+  const questDefinition = QUEST_REGISTRY[activeQuestKey];
+  const questConfig = { ...getFallbackQuestConfig(activeQuestKey), ...(eventQuest ?? {}) };
+  const [, refreshCompletion] = useState(0);
+  const completedSummary = eventQuest ? readCompletion(activeQuestKey, eventCode) : null;
+
+  // Код из ссылки проверяется сразу, сохранённое мероприятие обновляется в фоне.
   useEffect(() => {
-    let timerId = null;
-    let controller = null;
+    if (session.state.status === 'active') {
+      clearLinkCode();
+      return undefined;
+    }
     let disposed = false;
-    const canRefresh = state.status !== 'active' && !summary;
+    const saved = readEvent();
 
-    async function refreshConfig() {
-      controller?.abort();
-      controller = new AbortController();
-      try {
-        const config = await getQuestConfig({ signal: controller.signal });
-        if (!disposed) setServerQuestConfig(config);
-      } catch (error) {
-        if (!disposed && error.name !== 'AbortError') {
-          setServerQuestConfig((current) => current ?? getFallbackQuestConfig(MOCK_QUEST_KEY));
-        }
-      } finally {
-        if (!disposed) setConfigLoaded(true);
-        // Если экран регистрации открыт, активный квест обновляется без пересборки фронтенда.
-        if (!disposed && canRefresh) timerId = window.setTimeout(refreshConfig, 10000);
-      }
+    if (isValidEventCode(LINK_EVENT_CODE) && saved?.code !== LINK_EVENT_CODE) {
+      getEvent(LINK_EVENT_CODE)
+        .then((next) => {
+          if (disposed) return;
+          if (!next.isActive) throw closedEventError();
+          rememberEvent(next);
+          setEvent(next);
+          clearLinkCode();
+        })
+        .catch((error) => {
+          if (!disposed) setEventError(eventErrorMessage(error));
+        })
+        .finally(() => {
+          if (!disposed) setCheckingLink(false);
+        });
+    } else if (saved) {
+      if (saved.code === LINK_EVENT_CODE) clearLinkCode();
+      getEvent(saved.code)
+        .then((next) => {
+          if (disposed) return;
+          if (!next.isActive) throw closedEventError();
+          rememberEvent(next);
+          setEvent(next);
+        })
+        .catch((error) => {
+          // Без сети остаёмся с сохранённым мероприятием; итоги завершённой смены показываем и после закрытия.
+          if (disposed || error.status === 0 || readCompletion(normalizeQuestKey(saved.quest.key), saved.code)) return;
+          forgetEvent();
+          setEvent(null);
+          setNotice(eventErrorMessage(error));
+        });
     }
 
-    refreshConfig();
     return () => {
       disposed = true;
-      window.clearTimeout(timerId);
-      controller?.abort();
     };
-  }, [state.status, Boolean(summary)]);
-
-  const activeQuestKey = normalizeQuestKey(
-    state.status === 'active' ? state.participant?.quest?.key : serverQuestConfig?.key || MOCK_QUEST_KEY,
-  );
-  const questDefinition = QUEST_REGISTRY[activeQuestKey];
-  const questConfig = state.status === 'active' && state.participant?.quest
-    ? state.participant.quest
-    : serverQuestConfig ?? getFallbackQuestConfig(MOCK_QUEST_KEY);
-  const [, refreshCompletion] = useState(0);
-  const completedSummary = readCompletion(questConfig.key);
+  }, [session]);
 
   // Завершение в другой вкладке закрывает сохранённую активную сессию здесь.
   useEffect(() => {
-    const syncCompletion = (event) => {
-      if (!isCompletionStorageKey(event.key)) return;
-      if (readCompletion(session.state.participant?.quest?.key ?? questConfig.key)) session.clear();
+    const syncCompletion = (storageEvent) => {
+      if (!isCompletionStorageKey(storageEvent.key)) return;
+      const participant = session.state.participant;
+      const questKey = normalizeQuestKey(participant?.quest?.key ?? activeQuestKey);
+      if (readCompletion(questKey, participant?.event?.code ?? eventCode)) session.clear();
       refreshCompletion((value) => value + 1);
     };
     window.addEventListener('storage', syncCompletion);
     return () => window.removeEventListener('storage', syncCompletion);
-  }, [session, questConfig.key]);
+  }, [session, activeQuestKey, eventCode]);
 
   useEffect(() => {
-    document.title = `${questConfig.title || questDefinition.title} — квест`;
-  }, [questConfig.title, questDefinition.title]);
+    document.title = eventQuest ? `${questConfig.title || questDefinition.title} — квест` : 'Код мероприятия — квест';
+  }, [eventQuest, questConfig.title, questDefinition.title]);
 
   // Если завершение прошло, но страницу закрыли до показа итогов, восстанавливаем их из локального снимка.
   useEffect(() => {
@@ -103,10 +140,27 @@ export default function App() {
     }
   }, [state.status, summary, session]);
 
-  async function register(firstName, lastName) {
-    await session.register(firstName, lastName, questConfig.key);
+  const selectEvent = useCallback(async (code) => {
+    const next = await getEvent(code);
+    if (!next.isActive) throw closedEventError();
+    rememberEvent(next);
+    setEvent(next);
     setNotice('');
-    // Ответ регистрации содержит закреплённый за участником квест.
+    setEventError('');
+  }, []);
+
+  function changeEvent() {
+    forgetEvent();
+    setEvent(null);
+    setSummary(null);
+    setNotice('');
+    setEventError('');
+  }
+
+  async function register(firstName, lastName) {
+    await session.register(firstName, lastName, { ...event, quest: questConfig });
+    setNotice('');
+    // Ответ регистрации содержит квест мероприятия.
     await session.loadTasks().catch(() => {});
   }
 
@@ -120,6 +174,11 @@ export default function App() {
       session.clear();
       return true;
     } catch (error) {
+      // Сервер не знает токен — повтор не поможет, начинаем смену заново
+      if (error.status === 401) {
+        handleSessionLost();
+        return false;
+      }
       setFinishError(
         error.status === 0
           ? 'Не удалось сохранить результат на сервере. Проверьте соединение и повторите завершение смены.'
@@ -139,25 +198,45 @@ export default function App() {
   if (summary || completedSummary) {
     return (
       <ScreenShell>
-        <FinishScreen summary={summary ?? completedSummary} />
+        <FinishScreen summary={summary ?? completedSummary} onChangeEvent={changeEvent} />
       </ScreenShell>
     );
   }
 
-  if (state.status !== 'active') {
-    if (!configLoaded) {
+  if (!isActive) {
+    if (checkingLink) {
       return (
         <ScreenShell>
           <div className="stage-status welcome-loading">
             <Loader2 size={22} className="is-spinning" />
-            Загружаем настройки активного квеста...
+            Проверяем код мероприятия...
           </div>
         </ScreenShell>
       );
     }
+
+    if (!event) {
+      return (
+        <ScreenShell>
+          <EventCodeScreen
+            initialCode={LINK_EVENT_CODE}
+            initialError={eventError}
+            notice={notice}
+            onSubmit={selectEvent}
+          />
+        </ScreenShell>
+      );
+    }
+
     return (
       <ScreenShell>
-        <RegistrationScreen notice={notice} onRegister={register} quest={questConfig} />
+        <RegistrationScreen
+          notice={notice}
+          onRegister={register}
+          quest={questConfig}
+          event={event}
+          onChangeEvent={changeEvent}
+        />
       </ScreenShell>
     );
   }
@@ -170,10 +249,25 @@ export default function App() {
       onSessionLost={handleSessionLost}
       questDefinition={questDefinition}
       questConfig={questConfig}
+      eventCode={eventCode}
       finishError={finishError}
       finishPending={finishPending}
     />
   );
+}
+
+// Код из ссылки применён — убираем его из адреса, чтобы после смены кода перезагрузка не вернула прежнее мероприятие.
+// При ошибке проверки параметр остаётся: перезагрузка повторит попытку
+function clearLinkCode() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('id')) return;
+  url.searchParams.delete('id');
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+// Закрытое мероприятие: рейтинг доступен, регистрация — нет
+function closedEventError() {
+  return new ApiError(EVENT_CLOSED_MESSAGE, { status: 403 });
 }
 
 function ScreenShell({ children }) {
@@ -195,6 +289,7 @@ function QuestScreen({
   onSessionLost,
   questDefinition,
   questConfig,
+  eventCode,
   finishError,
   finishPending,
 }) {
@@ -205,6 +300,22 @@ function QuestScreen({
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
   const [showSkipModal, setShowSkipModal] = useState(false);
+  // Лимит времени смены: дедлайн с сервера или от начала смены (docs/quest-timer.md)
+  const limitSeconds = resolveTimeLimit(questConfig, getFallbackQuestConfig(questDefinition.key).time_limit_seconds);
+  const deadline = resolveDeadline(participant, limitSeconds);
+  const [timeUp, setTimeUp] = useState(false);
+  const timeUpStarted = useRef(false);
+
+  // Время вышло: смена завершается один раз, пока сохраняется результат — задания закрыты оверлеем
+  const handleTimeUp = useCallback(() => {
+    if (timeUpStarted.current) return;
+    timeUpStarted.current = true;
+    setTimeUp(true);
+    setShowFinishModal(false);
+    setShowSkipModal(false);
+    setRailOpen(false);
+    onFinish('timeout');
+  }, [onFinish]);
   const BrandIcon = questDefinition.key === 'orlov' ? TerminalSquare : PawPrint;
 
   // Фронтенд показывает интерфейсы, соответствующие task_type из API.
@@ -264,6 +375,10 @@ function QuestScreen({
         onSessionLost();
         return;
       }
+      if (isTimeExpired(error)) {
+        handleTimeUp();
+        return;
+      }
       setFeedback({
         type: 'error',
         message: error.status === 0
@@ -298,8 +413,13 @@ function QuestScreen({
             <div>
               <p>{questConfig.title || questDefinition.title}</p>
               <span>Смена: {participant.firstName} {participant.lastName}</span>
+              {eventCode && <span>Мероприятие {eventCode}</span>}
             </div>
           </div>
+
+          {deadline !== null && (
+            <QuestTimer deadline={deadline} offsetMs={participant.clockOffsetMs ?? 0} onExpire={handleTimeUp} />
+          )}
 
           <button
             className="ghost-action rail-toggle"
@@ -347,7 +467,7 @@ function QuestScreen({
           </div>
 
           <div className="rail-actions">
-            <a className="ghost-action leaderboard-link" href="/leaderboard"><Trophy size={16} />Лидерборд</a>
+            <a className="ghost-action leaderboard-link" href={leaderboardHref(eventCode)}><Trophy size={16} />Лидерборд</a>
             <button
               className="ghost-action"
               onClick={() => { setRailOpen(false); setShowFinishModal(true); }}
@@ -391,6 +511,32 @@ function QuestScreen({
           </p>
           {finishError && <p className="submit-feedback is-error" role="alert">{finishError}</p>}
         </ConfirmModal>
+      )}
+
+      {timeUp && (
+        <div className="reset-modal-backdrop time-up-backdrop">
+          <div className="challenge-frame reset-modal" role="alertdialog" aria-modal="true" aria-labelledby="time-up-title">
+            <div className="panel-title">
+              <Hourglass size={16} />
+              Лимит времени
+            </div>
+            <h2 id="time-up-title">Время смены вышло</h2>
+            {finishError ? (
+              <>
+                <p className="submit-feedback is-error" role="alert">{finishError}</p>
+                <button className="primary-action" disabled={finishPending} onClick={() => onFinish('timeout')}>
+                  <RotateCcw size={16} />
+                  Повторить
+                </button>
+              </>
+            ) : (
+              <p className="time-up-status">
+                <Loader2 size={18} className="is-spinning" />
+                Сохраняем результат...
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
       <section className="stage">

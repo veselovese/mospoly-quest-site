@@ -5,12 +5,13 @@
 
 ## Проект
 
-Веб-квест для школьников на мероприятии Мосполитеха. Участник вводит имя, проходит задания по нарастающей
-сложности (20–30 минут) и попадает в общий рейтинг.
+Веб-квест для школьников на мероприятиях Мосполитеха. Участник вводит код мероприятия, затем имя или ник,
+проходит задания по нарастающей сложности (20–30 минут) и попадает в рейтинг своего мероприятия.
 
-- Квест «Код манула» по теме «Московский зоопарк: генетика и кодирование»: 7 заданий в 4 блоках. Концепция,
-  сценарий (все тексты интерфейса) и пул заданий с форматами ответов — в `docs/zoo-quest/`.
-  Прежний квест про Орлова (SQL, Python, безопасность, сети, Git) удалён, он остался в истории git.
+- Два квеста (`src/quest/questRegistry.js`), какой открыть — определяет код мероприятия:
+  - `zoo` — «Код манула», «Московский зоопарк: генетика и кодирование»: 7 заданий в 4 блоках. Концепция,
+    сценарий (все тексты интерфейса) и пул заданий с форматами ответов — в `docs/zoo-quest/`;
+  - `orlov` — «Polytech Cyber Quest», расследование Орлова: 5 заданий (`src/quest/orlovQuest.js`).
 - Этот репозиторий — только фронтенд. Бэкенд (Python, Django REST Framework, PostgreSQL) разрабатывается
   отдельно: Гертнер Андрей и Коваленко Максим.
 - Задачи и комментарии руководителя (Матвей Веселов) — в таблице «Задачи (Квест сайт)»:
@@ -23,11 +24,13 @@ npm install       # package-lock.json в .gitignore — не коммитить
 npm run dev       # Vite на 0.0.0.0:5173, /api проксируется на VITE_API_PROXY (по умолчанию localhost:8000)
 npm run dev:mock  # то же, но без бэкенда: API отвечает мок из src/api/mock.js (режим .env.mock)
 npm run build     # сборка в dist/
+npm test          # node --test tests/ — тесты чистой логики (сессия, хранилища, навигация)
 npm run preview
 ```
 
 Переменные окружения — в `.env.example` (`VITE_API_URL`, `VITE_API_PROXY`, `VITE_API_MOCK`), личные значения —
-в `.env.local`. Тестов и линтера нет: проверка — сборка и ручной прогон в браузере.
+в `.env.local`. Линтера нет. Мероприятия мока: `6479` — зоопарк, `1234` — Орлов, `0000` — закрыто. Короткий лимит
+времени для проверки таймера — `VITE_MOCK_TIME_LIMIT_SECONDS=75` в `.env.mock.local`.
 
 ## Архитектура
 
@@ -39,10 +42,18 @@ npm run preview
   При `VITE_API_MOCK=true` запросы уходят в `src/api/mock.js` (база в localStorage, общая для вкладок,
   с демо-участниками). Мок подгружается динамически и в обычную сборку не попадает — проверка:
   `grep demo-token dist/assets/*.js` ничего не находит.
-- `src/pages/LeaderboardPage.jsx` — рейтинг, опрос `GET /api/ranking/` раз в 3 с, пауза в скрытой вкладке,
-  подсветка своей строки по `?me=Имя+Фамилия`.
-- `src/App.jsx` — поток экранов: нет сессии → `RegistrationScreen`, смена идёт → квест (боковая панель,
-  брифинг `StoryInterlude`, окно задания `ChallengeFrame`), завершение → `FinishScreen` и сброс сессии.
+- `src/pages/LeaderboardPage.jsx` — рейтинг мероприятия `/leaderboard?id=<код>`: опрос
+  `GET /api/events/<код>/ranking/` раз в 3 с, пауза в скрытой вкладке, подсветка своей строки по `&me=Имя+Фамилия`.
+  Без `id` — форма кода (`EventCodeForm`).
+- `src/App.jsx` — поток экранов: итоги этого мероприятия → `FinishScreen`; смена идёт → квест (боковая панель,
+  брифинг `StoryInterlude`, окно задания `ChallengeFrame`); мероприятие не выбрано → `EventCodeScreen`;
+  иначе → `RegistrationScreen`. `/?id=<код>` (QR-код) выбирает мероприятие сам.
+- `src/session/eventCode.js` — нормализация кода (4–8 цифр), выбранное мероприятие в localStorage
+  (`quest-event:v1`), тексты ошибок, `leaderboardHref`. Поток и контракт — `docs/event-code.md`.
+- `src/session/completionStore.js` — барьер повторного прохождения на пару «квест + мероприятие»
+  (`docs/prevent-repeat-quest.md`).
+- `src/session/questTimer.js` + `src/components/QuestTimer.jsx` — лимит времени смены: дедлайн, поправка часов,
+  обратный отсчёт в верхней части боковой панели, автозавершение `finish('timeout')` (`docs/quest-timer.md`).
 - `src/quest/zooQuest.js` — тексты заданий и концовок по `task_type`: брифинг, итог, краткое условие, памятка,
   подсказки, иконка, цвет, компонент. Задания приходят с бэкенда (`GET /api/tasks/`), показываются только
   те, для которых здесь есть описание.
@@ -63,7 +74,8 @@ npm run preview
   → деплой по SSH. `main` — прод, `dev` — стейдж. Push в `dev` сразу выкатывается на стейдж.
 - `Dockerfile`: сборка на `node:22-alpine`, раздача `dist/` через `nginx:stable-alpine` с `deploy/nginx.conf`
   (SPA-fallback: любой путь отдаёт `index.html`, иначе `/leaderboard` даёт 404).
-- Запросы `/api` в проде должны уходить на бэкенд через Caddy — в `deploy/Caddyfile` этого пока нет.
+- Caddy отправляет `/api`, `/admin`, `/static` в контейнер `backend:8000` (сеть `quest_backend`),
+  остальное — во фронтенд (`docs/server-integration.md`).
 - `deploy/`: `docker-compose.yml` и `Caddyfile` (`:80` → `frontend-prod`, `:8080` → `frontend-stage`),
   `deploy.sh` на сервере в `/opt/quest`.
 
@@ -72,12 +84,19 @@ npm run preview
 Источник истины — документ «Backend (1)»:
 https://docs.google.com/document/d/1fm_Te2qU-venO1RUg8qCLwjuakVoO_niPZM05p0PdNw/edit
 
-- `POST /api/participants/` `{first_name, last_name}` → `{participant_id, first_name, last_name, token, started_at}`,
-  без авторизации.
+- `GET /api/events/{code}/` → `{code, title, is_active, quest}` — мероприятие и его квест, без авторизации.
+- `POST /api/participants/` `{first_name, last_name, event_code}` → `{participant_id, first_name, last_name, token,
+  started_at, event_code, quest}`, без авторизации.
 - `GET /api/tasks/` → `[{id, title, task_type, points, order}]` — только активные задания, без правильного ответа.
 - `POST /api/tasks/{task_id}/attempts/` `{answer}` → `{correct, points_earned, attempts_count}`.
-- `GET /api/ranking/` → `[{place, first_name, last_name, score, solved_tasks, attempts_count, time_seconds}]`,
-  без авторизации.
+- `POST /api/participants/finish/` `{reason: completed|gave_up|timeout}` → итоги участника (`score`, `solved_tasks`,
+  `time_seconds`...).
+- Лимит времени: `quest.time_limit_seconds`, у участника `deadline_at` и `server_time`; после дедлайна попытки —
+  `409 {code: "time_expired"}` (`docs/quest-timer.md`).
+- `GET /api/events/{code}/ranking/` → `[{place, first_name, last_name, score, solved_tasks, attempts_count,
+  time_seconds}]` — рейтинг мероприятия, без авторизации.
+- Ручки мероприятий и таймера — предложенный фронтендом контракт (`docs/event-code.md`, `docs/quest-timer.md`): бэкенд A23 в работе, приватный
+  репозиторий `LineAhpe/mospoly-quest-backend`. Расхождения правятся в `src/api/client.js` и моке.
 - Авторизация: заголовок `Authorization: Token <token>`.
 - Правильные ответы хранит и проверяет бэкенд (`tasks.correct_answer`), фронт отправляет строку ответа.
   Задание на бэке и его интерфейс на фронте связывает `task_type`. Формат строки ответа для каждого
@@ -95,7 +114,9 @@ https://docs.google.com/document/d/1fm_Te2qU-venO1RUg8qCLwjuakVoO_niPZM05p0PdNw/
 ## Решения руководителя (не пересматривать без запроса)
 
 Из комментариев к задачам в таблице:
-- Квест рассчитан на 20–30 минут. Задания идут от простых к сложным, в блоке может быть несколько заданий.
+- Сайт открывается с ввода кода мероприятия (только цифры). Код задаёт квест (настраивается в админке),
+  рейтинги формируются по мероприятию: `/leaderboard?id=6479`.
+- Квест рассчитан на 20–30 минут. Лимит времени смены хранится на бэке: зоопарк — 40 минут, Орлов — 30 минут. Задания идут от простых к сложным, в блоке может быть несколько заданий.
 - Без сохранённого прогресса квест начинается с ввода имени, с прогрессом — с последнего шага.
 - Сдаться можно в любой момент: квест завершается концовкой по сценарию, при полном прохождении — финал.
   В обоих случаях есть призыв «ищи себя на лидерборде».

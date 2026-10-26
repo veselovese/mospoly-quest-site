@@ -100,8 +100,10 @@ button:disabled {
   white-space: nowrap;
 }
 
-.rail-toggle,
-.rail-progress {
+/* Кнопка меню и полоска прогресса нужны только в компактной верхней полосе (до 1080 px).
+   Селектор через .rail-top, чтобы перебить display у .ghost-action */
+.rail-top .rail-toggle,
+.rail-top .rail-progress {
   display: none;
 }
 
@@ -696,7 +698,7 @@ th {
     height: 40px;
   }
 
-  .rail-toggle {
+  .rail-top .rail-toggle {
     display: inline-flex;
     padding: 0 12px;
   }
@@ -705,7 +707,7 @@ th {
     color: var(--accent);
   }
 
-  .rail-progress {
+  .rail-top .rail-progress {
     display: block;
     grid-column: 1 / -1;
     height: 3px;
@@ -2318,5 +2320,182 @@ th {
     display: block;
     color: #000;
     font-size: 16pt;
+  }
+}
+
+/* Код мероприятия */
+
+.event-code-input {
+  min-height: 56px;
+  font-family: "Cascadia Mono", "Fira Code", Consolas, monospace;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.event-code-input::placeholder {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.event-badge {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  background: rgba(var(--accent-rgb), 0.08);
+  color: #c9d9e8;
+  font-size: 0.88rem;
+}
+
+.event-badge svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.event-badge strong {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-change {
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.leaderboard-links {
+  grid-area: back;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.leaderboard-picker {
+  width: min(32rem, 100%);
+}
+
+/* Таймер смены */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.quest-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(237, 247, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c9d9e8;
+  font-size: 0.85rem;
+}
+
+.quest-timer svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.quest-timer strong {
+  margin-left: auto;
+  color: #ffffff;
+  font-family: "Cascadia Mono", "Fira Code", Consolas, monospace;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quest-timer.is-warning {
+  border-color: rgba(255, 221, 85, 0.6);
+  background: rgba(255, 221, 85, 0.1);
+}
+
+.quest-timer.is-warning svg,
+.quest-timer.is-warning strong {
+  color: #ffdd55;
+}
+
+.quest-timer.is-critical {
+  border-color: rgba(255, 95, 159, 0.75);
+  background: rgba(255, 95, 159, 0.14);
+  animation: timerPulse 1s ease-in-out infinite;
+}
+
+.quest-timer.is-critical svg,
+.quest-timer.is-critical strong {
+  color: #ff8fbb;
+}
+
+@keyframes timerPulse {
+  50% {
+    box-shadow: 0 0 18px rgba(255, 95, 159, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quest-timer.is-critical {
+    animation: none;
+  }
+}
+
+.time-up-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c9d9e8;
+}
+
+/* На узких экранах таймер — между брендом и кнопкой меню в верхней полосе */
+@media (max-width: 1080px) {
+  .rail-top {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .quest-timer {
+    margin-top: 0;
+    min-height: 44px;
+    padding: 0 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .quest-timer-label {
+    display: none;
+  }
+
+  .quest-timer {
+    gap: 6px;
+  }
+
+  .quest-timer strong {
+    font-size: 1rem;
+  }
+}
+
+/* На самых узких экранах место в верхней полосе нужнее тексту, чем иконке */
+@media (max-width: 400px) {
+  .rail-top .brand-mark {
+    display: none;
   }
 }

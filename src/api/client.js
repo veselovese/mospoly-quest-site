@@ -56,16 +56,27 @@ export async function request(path, { method = 'GET', token, body, signal } = {}
   return data;
 }
 
-// Конфигурация, которую выбрал организатор в административной панели бэкенда.
-export function getQuestConfig({ signal } = {}) {
-  return request('/quest-config/', { signal });
+// Мероприятие по коду: название и квест, который организатор закрепил за кодом в админке.
+// Возвращает { code, title, quest, isActive }; 404 — кода нет. Закрытое мероприятие (is_active: false)
+// отдаётся, чтобы был доступен его рейтинг, но регистрация на нём отклоняется (см. docs/event-code.md)
+export async function getEvent(code, { signal } = {}) {
+  const data = await request(`/events/${encodeURIComponent(code)}/`, { signal });
+  if (typeof data?.quest?.key !== 'string') {
+    throw new ApiError('Сервер не вернул квест мероприятия', { status: 500, data });
+  }
+  return {
+    code: String(data.code ?? code),
+    title: data.title ?? '',
+    quest: data.quest,
+    isActive: data.is_active !== false,
+  };
 }
 
-// Регистрация участника: сервер сам назначает ему активный квест.
-export function registerParticipant({ firstName, lastName }) {
+// Регистрация участника на мероприятии: квест берётся из мероприятия.
+export function registerParticipant({ firstName, lastName, eventCode }) {
   return request('/participants/', {
     method: 'POST',
-    body: { first_name: firstName, last_name: lastName },
+    body: { first_name: firstName, last_name: lastName, event_code: eventCode },
   });
 }
 
@@ -92,7 +103,7 @@ export function finishParticipant(token, reason) {
   });
 }
 
-// Рейтинг активного квеста, доступен без авторизации
-export function getRanking({ signal } = {}) {
-  return request('/ranking/', { signal });
+// Рейтинг мероприятия, доступен без авторизации
+export function getEventRanking(code, { signal } = {}) {
+  return request(`/events/${encodeURIComponent(code)}/ranking/`, { signal });
 }
