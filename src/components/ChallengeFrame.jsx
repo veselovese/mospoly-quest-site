@@ -4,7 +4,7 @@ import { plural } from '../utils/format';
 import HintPanel from './HintPanel';
 
 // Окно выполнения задания: краткое условие, баллы и попытки, рабочая область, памятка и подсказки
-export default function ChallengeFrame({ task, solved, attempts, onBrief, children }) {
+export default function ChallengeFrame({ task, solved, attempts, onBrief, hintReceipt, onRevealHint, pending = false, children }) {
   const [briefOpen, setBriefOpen] = useState(true);
   const briefId = `task-brief-${task.taskType}`;
 
@@ -38,7 +38,7 @@ export default function ChallengeFrame({ task, solved, attempts, onBrief, childr
         <div className="task-meta">
           <span>
             <Star size={15} />
-            {task.points} {plural(task.points, ['балл', 'балла', 'баллов'])}
+            {hintReceipt?.availablePoints ?? task.points} {plural(hintReceipt?.availablePoints ?? task.points, ['балл', 'балла', 'баллов'])}
           </span>
           <span>
             <Repeat size={15} />
@@ -62,7 +62,7 @@ export default function ChallengeFrame({ task, solved, attempts, onBrief, childr
               ))}
             </ul>
           </div>
-          <HintPanel key={task.taskType} hints={task.hints} />
+          <HintPanel key={task.taskType} hints={task.hints} policy={task.hintPenalty} receipt={hintReceipt} onReveal={onRevealHint} disabled={solved || pending} />
         </aside>
       </div>
     </div>
