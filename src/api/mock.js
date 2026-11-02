@@ -109,8 +109,6 @@ function registerParticipant(db, body) {
   if (!lastName) errors.last_name = ['Обязательное поле.'];
   if (firstName.length > 50) errors.first_name = ['Не более 50 символов.'];
   if (lastName.length > 50) errors.last_name = ['Не более 50 символов.'];
-  const eventCode = body?.event_code;
-  if (eventCode !== undefined && !/^\d{4,8}$/.test(String(eventCode))) errors.event_code = ['Введите правильное значение.'];
   if (Object.keys(errors).length > 0) throw new ApiError('Проверьте имя и фамилию', { status: 400, data: errors });
 
   const now = new Date().toISOString();
@@ -131,7 +129,6 @@ function registerParticipant(db, body) {
     last_name: participant.last_name,
     token: participant.token,
     started_at: participant.started_at,
-    event_code: eventCode ?? null,
     quest: publicQuestConfig(participant.quest_key),
   };
 }
