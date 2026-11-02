@@ -1,16 +1,16 @@
-import { Ticket, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { getEnding } from '../quest/zooQuest';
 import { getOrlovEnding } from '../quest/orlovQuest';
 import { formatDuration } from '../utils/format';
-import { leaderboardHref } from '../session/eventCode';
 import { splitStory } from './StoryInterlude';
 
-// Экран итогов: концовка по числу решённых заданий, итоги и призыв найти себя в рейтинге мероприятия
-export default function FinishScreen({ summary, onChangeEvent }) {
+// Экран итогов: концовка по числу решённых заданий, итоги и призыв найти себя в рейтинге
+export default function FinishScreen({ summary }) {
   const ending = summary.questKey === 'orlov'
     ? getOrlovEnding(summary.solvedCount, summary.totalTasks)
     : getEnding(summary.solvedCount, summary.totalTasks);
   const fullName = `${summary.firstName} ${summary.lastName}`.trim();
+  const leaderboardHref = `/leaderboard${fullName ? `?me=${encodeURIComponent(fullName)}` : ''}`;
 
   const stats = [
     ['Баллы', summary.score],
@@ -22,12 +22,9 @@ export default function FinishScreen({ summary, onChangeEvent }) {
   return (
     <div className="finish-screen">
       <div className="finish-card">
-        <span className="eyebrow">
-          {summary.finishReason === 'timeout' ? 'Время смены вышло' : ending.isFinal ? 'Финал' : 'Смена завершена'}
-        </span>
+        <span className="eyebrow">{ending.isFinal ? 'Финал' : 'Смена завершена'}</span>
         <h1>{ending.title}</h1>
         {fullName && <p>Участник: <strong>{fullName}</strong></p>}
-        {summary.eventCode && <p>Мероприятие: <strong>{summary.eventCode}</strong></p>}
 
         <div className="finish-text">
           {splitStory(ending.text).map((paragraph) => (
@@ -45,20 +42,14 @@ export default function FinishScreen({ summary, onChangeEvent }) {
         </dl>
 
         <div className="finish-actions">
-          <a className="primary-action" href={leaderboardHref(summary.eventCode, fullName)}>
+          <a className="primary-action" href={leaderboardHref}>
             <Trophy size={18} />
             Найди себя на лидерборде
           </a>
-          {onChangeEvent && (
-            <button className="ghost-action" onClick={onChangeEvent}>
-              <Ticket size={16} />
-              Ввести другой код мероприятия
-            </button>
-          )}
         </div>
 
         <p className="finish-note">
-          Результат сохранён. Повторно пройти квест этого мероприятия на этом устройстве нельзя.
+          Результат сохранён. Повторное прохождение этого квеста на этом устройстве недоступно.
         </p>
       </div>
     </div>
