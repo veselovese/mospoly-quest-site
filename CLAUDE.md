@@ -72,10 +72,8 @@ npm run preview
 Источник истины — документ «Backend (1)»:
 https://docs.google.com/document/d/1fm_Te2qU-venO1RUg8qCLwjuakVoO_niPZM05p0PdNw/edit
 
-- `POST /api/participants/` `{first_name, last_name, event_code}` → `{participant_id, first_name, last_name, token,
-  started_at, event_code, deadline_at, server_time, quest}`, без авторизации. `event_code` — код мероприятия из 4–8 цифр
-  (создаётся в админке бэкенда); неизвестный код — 404, закрытая регистрация — 403. Экран регистрации берёт код
-  из поля ввода или из ссылки `?event=6479`.
+- `POST /api/participants/` `{first_name, last_name}` → `{participant_id, first_name, last_name, token, started_at}`,
+  без авторизации.
 - `GET /api/tasks/` → `[{id, title, task_type, points, order}]` — только активные задания, без правильного ответа.
 - `POST /api/tasks/{task_id}/attempts/` `{answer}` → `{correct, points_earned, attempts_count}`.
 - `GET /api/ranking/` → `[{place, first_name, last_name, score, solved_tasks, attempts_count, time_seconds}]`,

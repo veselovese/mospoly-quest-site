@@ -100,15 +100,11 @@ export class QuestSession {
   }
 
   // Регистрирует участника на бэкенде и начинает новую сессию
-  async register(firstName, lastName, questKey, eventCode) {
+  async register(firstName, lastName, questKey) {
     if (this.#state.status !== 'new' || readCompletion(questKey)) {
       throw new ApiError('На этом устройстве смена уже начата или завершена.', { status: 409 });
     }
-    const response = await registerParticipant({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      eventCode: eventCode?.trim(),
-    });
+    const response = await registerParticipant({ firstName: firstName.trim(), lastName: lastName.trim() });
 
     this.#replace({
       ...createInitialState(),
