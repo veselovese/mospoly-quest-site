@@ -61,12 +61,11 @@ export function getQuestConfig({ signal } = {}) {
   return request('/quest-config/', { signal });
 }
 
-// Регистрация участника: сервер сам назначает ему активный квест.
-export function registerParticipant({ firstName, lastName }) {
-  return request('/participants/', {
-    method: 'POST',
-    body: { first_name: firstName, last_name: lastName },
-  });
+// Регистрация участника по коду мероприятия: сервер сам назначает ему квест этого мероприятия.
+export function registerParticipant({ firstName, lastName, eventCode }) {
+  const body = { first_name: firstName, last_name: lastName };
+  if (eventCode) body.event_code = eventCode;
+  return request('/participants/', { method: 'POST', body });
 }
 
 // Активные задания участника (без правильных ответов)

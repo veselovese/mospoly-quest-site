@@ -103,8 +103,8 @@ export default function App() {
     }
   }, [state.status, summary, session]);
 
-  async function register(firstName, lastName) {
-    await session.register(firstName, lastName, questConfig.key);
+  async function register(firstName, lastName, eventCode) {
+    await session.register(firstName, lastName, questConfig.key, eventCode);
     setNotice('');
     // Ответ регистрации содержит закреплённый за участником квест.
     await session.loadTasks().catch(() => {});
